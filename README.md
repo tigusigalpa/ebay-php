@@ -210,7 +210,113 @@ $orders = Ebay::trading()->getOrders([
 
 ## Quick Start
 
-### Using the Facade
+### Standalone PHP Usage (Without Laravel)
+
+You can use this package in any PHP project, not just Laravel applications:
+
+```php
+<?php
+
+require_once 'vendor/autoload.php';
+
+use Tigusigalpa\Ebay\Ebay;
+use Tigusigalpa\Ebay\Enums\Site;
+
+// Initialize the eBay client with your credentials
+$config = [
+    'environment' => 'sandbox', // or 'production'
+    'sandbox' => [
+        'app_id' => 'your-sandbox-app-id',
+        'cert_id' => 'your-sandbox-cert-id',
+        'dev_id' => 'your-sandbox-dev-id',
+        'runame' => 'your-sandbox-runame',
+    ],
+    'production' => [
+        'app_id' => 'your-production-app-id',
+        'cert_id' => 'your-production-cert-id',
+        'dev_id' => 'your-production-dev-id',
+        'runame' => 'your-production-runame',
+    ],
+    'site' => Site::US,
+];
+
+$ebay = new Ebay($config);
+
+// Step 1: Get OAuth consent URL
+$consentUrl = $ebay->getConsentUrl(
+    scopes: [
+        'https://api.ebay.com/oauth/api_scope',
+        'https://api.ebay.com/oauth/api_scope/sell.inventory',
+    ],
+    state: 'your-state-token'
+);
+
+echo "Visit this URL to authorize: {$consentUrl}\n";
+
+// Step 2: After user authorizes, exchange code for tokens
+// (You'll receive the code in your redirect URL)
+$code = $_GET['code'] ?? 'authorization-code-from-callback';
+
+try {
+    $tokenData = $ebay->exchangeCodeForToken($code);
+    
+    // Store these tokens securely
+    $accessToken = $tokenData['access_token'];
+    $refreshToken = $tokenData['refresh_token'];
+    $expiresAt = $tokenData['expires_at'];
+    
+    echo "Access Token: {$accessToken}\n";
+    
+} catch (\Exception $e) {
+    echo "Error: " . $e->getMessage();
+}
+
+// Step 3: Use the tokens for API calls
+$ebay->setAccessToken($accessToken, $expiresAt);
+$ebay->setRefreshToken($refreshToken, $tokenData['refresh_token_expires_at']);
+
+// Get orders from Trading API
+$ebay->setSite(Site::US);
+$orders = $ebay->trading()->getOrders([
+    'CreateTimeFrom' => date('c', strtotime('-30 days')),
+    'CreateTimeTo' => date('c'),
+    'OrderStatus' => 'Active',
+]);
+
+// Process orders
+if (isset($orders->OrderArray->Order)) {
+    foreach ($orders->OrderArray->Order as $order) {
+        $orderId = (string) $order->OrderID;
+        $total = (float) $order->Total;
+        $currency = (string) $order->Total['currencyID'];
+        
+        echo "Order {$orderId}: {$currency} {$total}\n";
+    }
+}
+
+// Get item details
+$item = $ebay->trading()->getItem('123456789');
+$title = (string) $item->Item->Title;
+$price = (float) $item->Item->SellingStatus->CurrentPrice;
+
+echo "Item: {$title} - \${$price}\n";
+
+// Use Commerce API for translation
+$translated = $ebay->commerce()->translate(
+    text: 'Brand New iPhone',
+    fromLanguage: 'en',
+    toLanguage: 'de',
+    context: 'ITEM_TITLE'
+);
+
+echo "Translated: {$translated}\n";
+
+// Switch to different marketplace
+$ebay->setSite(Site::UK);
+$ukOrders = $ebay->trading()->getOrders();
+```
+
+### Laravel: Using the Facade
 
 ```php
 use Tigusigalpa\Ebay\Facades\Ebay;
@@ -243,7 +349,7 @@ $translated = Ebay::commerce()->translate(
 );
 ```
 
-### Using Dependency Injection
+### Laravel: Using Dependency Injection
 
 ```php
 use Tigusigalpa\Ebay\Ebay;

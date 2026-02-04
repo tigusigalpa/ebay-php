@@ -1,10 +1,13 @@
 # eBay PHP Package - Usage Examples
 
-This document provides comprehensive examples for using the eBay PHP/Laravel package.
+This document provides comprehensive examples for using the eBay PHP package in both **standalone PHP** and **Laravel**
+applications.
 
 ## Table of Contents
 
-- [Setup](#setup)
+- [Standalone PHP Setup](#standalone-php-setup)
+- [Standalone PHP Examples](#standalone-php-examples)
+- [Laravel Setup](#laravel-setup)
 - [Authentication](#authentication)
 - [Trading API Examples](#trading-api-examples)
 - [Commerce API Examples](#commerce-api-examples)
@@ -12,7 +15,407 @@ This document provides comprehensive examples for using the eBay PHP/Laravel pac
 - [Error Handling](#error-handling)
 - [Advanced Usage](#advanced-usage)
 
-## Setup
+## Standalone PHP Setup
+
+### Installation (Vanilla PHP)
+
+```bash
+composer require tigusigalpa/ebay-php
+```
+
+### Basic Configuration
+
+Create a configuration file or define your credentials:
+
+```php
+<?php
+// config.php
+
+return [
+    'environment' => 'sandbox', // or 'production'
+    'sandbox' => [
+        'app_id' => 'YourSandboxAppId',
+        'cert_id' => 'YourSandboxCertId',
+        'dev_id' => 'YourSandboxDevId',
+        'runame' => 'YourSandboxRuName',
+    ],
+    'production' => [
+        'app_id' => 'YourProductionAppId',
+        'cert_id' => 'YourProductionCertId',
+        'dev_id' => 'YourProductionDevId',
+        'runame' => 'YourProductionRuName',
+    ],
+    'site' => \Tigusigalpa\Ebay\Enums\Site::US,
+    'scopes' => [
+        'https://api.ebay.com/oauth/api_scope',
+        'https://api.ebay.com/oauth/api_scope/sell.inventory',
+        'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
+    ],
+];
+```
+
+## Standalone PHP Examples
+
+### Complete OAuth Flow in Plain PHP
+
+```php
+<?php
+// oauth_example.php
+
+require_once 'vendor/autoload.php';
+
+use Tigusigalpa\Ebay\Ebay;
+use Tigusigalpa\Ebay\Enums\Site;
+
+session_start();
+
+$config = require 'config.php';
+$ebay = new Ebay($config);
+
+// Step 1: Generate consent URL
+if (!isset($_GET['code'])) {
+    $state = bin2hex(random_bytes(16));
+    $_SESSION['oauth_state'] = $state;
+    
+    $consentUrl = $ebay->getConsentUrl(
+        scopes: $config['scopes'],
+        state: $state
+    );
+    
+    echo "<h1>eBay OAuth Authorization</h1>";
+    echo "<p><a href='{$consentUrl}'>Click here to authorize with eBay</a></p>";
+    exit;
+}
+
+// Step 2: Handle callback
+if (isset($_GET['code']) && isset($_GET['state'])) {
+    // Verify state
+    if ($_GET['state'] !== $_SESSION['oauth_state']) {
+        die('Invalid state parameter');
+    }
+    
+    try {
+        $tokenData = $ebay->exchangeCodeForToken($_GET['code']);
+        
+        // Store tokens (in production, use database)
+        $_SESSION['ebay_access_token'] = $tokenData['access_token'];
+        $_SESSION['ebay_access_token_expires'] = $tokenData['expires_at'];
+        $_SESSION['ebay_refresh_token'] = $tokenData['refresh_token'];
+        $_SESSION['ebay_refresh_token_expires'] = $tokenData['refresh_token_expires_at'];
+        
+        echo "<h1>Authorization Successful!</h1>";
+        echo "<p>Access Token: " . substr($tokenData['access_token'], 0, 20) . "...</p>";
+        echo "<p>Expires: " . date('Y-m-d H:i:s', $tokenData['expires_at']) . "</p>";
+        echo "<p><a href='get_orders.php'>View Orders</a></p>";
+        
+    } catch (\Exception $e) {
+        echo "Error: " . $e->getMessage();
+    }
+}
+```
+
+### Fetching Orders in Plain PHP
+
+```php
+<?php
+// get_orders.php
+
+require_once 'vendor/autoload.php';
+
+use Tigusigalpa\Ebay\Ebay;
+use Tigusigalpa\Ebay\Enums\Site;
+use Tigusigalpa\Ebay\Http\Resources\Order;
+
+session_start();
+
+if (!isset($_SESSION['ebay_access_token'])) {
+    header('Location: oauth_example.php');
+    exit;
+}
+
+$config = require 'config.php';
+$ebay = new Ebay($config);
+
+// Set stored tokens
+$ebay->setAccessToken(
+    $_SESSION['ebay_access_token'],
+    $_SESSION['ebay_access_token_expires']
+);
+
+$ebay->setRefreshToken(
+    $_SESSION['ebay_refresh_token'],
+    $_SESSION['ebay_refresh_token_expires']
+);
+
+try {
+    // Get orders from last 30 days
+    $xml = $ebay->trading()->getOrders([
+        'CreateTimeFrom' => date('c', strtotime('-30 days')),
+        'CreateTimeTo' => date('c'),
+        'OrderStatus' => 'Active',
+    ]);
+    
+    echo "<h1>eBay Orders</h1>";
+    echo "<table border='1'>";
+    echo "<tr><th>Order ID</th><th>Buyer</th><th>Total</th><th>Status</th><th>Date</th></tr>";
+    
+    if (isset($xml->OrderArray->Order)) {
+        foreach ($xml->OrderArray->Order as $orderXml) {
+            $order = Order::fromXml($orderXml);
+            
+            echo "<tr>";
+            echo "<td>{$order->orderId}</td>";
+            echo "<td>{$order->buyerUserId}</td>";
+            echo "<td>{$order->currencyCode} {$order->total}</td>";
+            echo "<td>{$order->orderStatus->title()}</td>";
+            echo "<td>" . date('Y-m-d H:i', strtotime($order->createdTime)) . "</td>";
+            echo "</tr>";
+        }
+    } else {
+        echo "<tr><td colspan='5'>No orders found</td></tr>";
+    }
+    
+    echo "</table>";
+    
+} catch (\Exception $e) {
+    echo "Error: " . $e->getMessage();
+}
+```
+
+### Creating Listings in Plain PHP
+
+```php
+<?php
+// create_listing.php
+
+require_once 'vendor/autoload.php';
+
+use Tigusigalpa\Ebay\Ebay;
+use Tigusigalpa\Ebay\Enums\{Site, Condition, Country};
+
+session_start();
+
+$config = require 'config.php';
+$ebay = new Ebay($config);
+
+// Set tokens
+$ebay->setAccessToken($_SESSION['ebay_access_token'], $_SESSION['ebay_access_token_expires']);
+$ebay->setRefreshToken($_SESSION['ebay_refresh_token'], $_SESSION['ebay_refresh_token_expires']);
+
+// Set marketplace
+$ebay->setSite(Site::US);
+
+// Prepare item data
+$itemData = [
+    'Title' => 'Brand New Wireless Headphones - Premium Sound Quality',
+    'Description' => '<![CDATA[
+        <h1>Premium Wireless Headphones</h1>
+        <p>Brand new, sealed in original packaging.</p>
+        <ul>
+            <li>Bluetooth 5.0</li>
+            <li>30-hour battery life</li>
+            <li>Active noise cancellation</li>
+        </ul>
+    ]]>',
+    'PrimaryCategory' => [
+        'CategoryID' => '112529', // Consumer Electronics > Headphones
+    ],
+    'StartPrice' => 79.99,
+    'ConditionID' => Condition::NEW->value,
+    'Country' => Country::US->value,
+    'Currency' => 'USD',
+    'DispatchTimeMax' => 3,
+    'ListingDuration' => 'GTC', // Good 'Til Cancelled
+    'ListingType' => 'FixedPriceItem',
+    'Location' => 'New York, NY',
+    'Quantity' => 10,
+    'PaymentMethods' => 'PayPal',
+    'PayPalEmailAddress' => 'seller@example.com',
+    'PictureDetails' => [
+        'PictureURL' => [
+            'https://example.com/headphones-1.jpg',
+            'https://example.com/headphones-2.jpg',
+        ],
+    ],
+    'ShippingDetails' => [
+        'ShippingType' => 'Flat',
+        'ShippingServiceOptions' => [
+            'ShippingServicePriority' => 1,
+            'ShippingService' => 'USPSPriority',
+            'ShippingServiceCost' => 5.99,
+        ],
+    ],
+    'ReturnPolicy' => [
+        'ReturnsAcceptedOption' => 'ReturnsAccepted',
+        'RefundOption' => 'MoneyBack',
+        'ReturnsWithinOption' => 'Days_30',
+        'ShippingCostPaidByOption' => 'Buyer',
+    ],
+];
+
+try {
+    $response = $ebay->trading()->addFixedPriceItem($itemData);
+    
+    $itemId = (string) $response->ItemID;
+    
+    echo "<h1>Listing Created Successfully!</h1>";
+    echo "<p><strong>Item ID:</strong> {$itemId}</p>";
+    echo "<p><strong>View on eBay:</strong> <a href='https://www.ebay.com/itm/{$itemId}' target='_blank'>Click here</a></p>";
+    
+    // Display fees
+    if (isset($response->Fees->Fee)) {
+        echo "<h2>Listing Fees:</h2>";
+        echo "<ul>";
+        foreach ($response->Fees->Fee as $fee) {
+            $feeName = (string) $fee->Name;
+            $feeAmount = (float) $fee->Fee;
+            echo "<li>{$feeName}: \${$feeAmount}</li>";
+        }
+        echo "</ul>";
+    }
+    
+} catch (\Exception $e) {
+    echo "<h1>Error Creating Listing</h1>";
+    echo "<p>" . $e->getMessage() . "</p>";
+}
+```
+
+### Multi-Marketplace Listing (Plain PHP)
+
+```php
+<?php
+// multi_marketplace.php
+
+require_once 'vendor/autoload.php';
+
+use Tigusigalpa\Ebay\Ebay;
+use Tigusigalpa\Ebay\Enums\Site;
+
+$config = require 'config.php';
+$ebay = new Ebay($config);
+
+// Set tokens
+$ebay->setAccessToken($_SESSION['ebay_access_token'], $_SESSION['ebay_access_token_expires']);
+
+// Define marketplaces
+$marketplaces = [
+    Site::US => ['price' => 99.99, 'currency' => 'USD'],
+    Site::UK => ['price' => 79.99, 'currency' => 'GBP'],
+    Site::GERMANY => ['price' => 89.99, 'currency' => 'EUR'],
+    Site::FRANCE => ['price' => 89.99, 'currency' => 'EUR'],
+];
+
+$results = [];
+
+foreach ($marketplaces as $site => $pricing) {
+    try {
+        $ebay->setSite($site);
+        
+        $itemData = [
+            'Title' => 'Premium Product - International Shipping Available',
+            'StartPrice' => $pricing['price'],
+            'Currency' => $pricing['currency'],
+            // ... other fields
+        ];
+        
+        $response = $ebay->trading()->addFixedPriceItem($itemData);
+        $itemId = (string) $response->ItemID;
+        
+        $results[] = [
+            'site' => $site->title(),
+            'item_id' => $itemId,
+            'price' => $pricing['price'],
+            'currency' => $pricing['currency'],
+            'success' => true,
+        ];
+        
+    } catch (\Exception $e) {
+        $results[] = [
+            'site' => $site->title(),
+            'error' => $e->getMessage(),
+            'success' => false,
+        ];
+    }
+}
+
+// Display results
+echo "<h1>Multi-Marketplace Listing Results</h1>";
+echo "<table border='1'>";
+echo "<tr><th>Marketplace</th><th>Item ID</th><th>Price</th><th>Status</th></tr>";
+
+foreach ($results as $result) {
+    echo "<tr>";
+    echo "<td>{$result['site']}</td>";
+    
+    if ($result['success']) {
+        echo "<td>{$result['item_id']}</td>";
+        echo "<td>{$result['currency']} {$result['price']}</td>";
+        echo "<td style='color: green;'>✓ Success</td>";
+    } else {
+        echo "<td colspan='2'>{$result['error']}</td>";
+        echo "<td style='color: red;'>✗ Failed</td>";
+    }
+    
+    echo "</tr>";
+}
+
+echo "</table>";
+```
+
+### Inventory Sync Script (Plain PHP)
+
+```php
+<?php
+// sync_inventory.php
+
+require_once 'vendor/autoload.php';
+
+use Tigusigalpa\Ebay\Ebay;
+use Tigusigalpa\Ebay\Enums\Site;
+
+// Your product database (example)
+$products = [
+    ['sku' => 'PROD-001', 'quantity' => 15],
+    ['sku' => 'PROD-002', 'quantity' => 8],
+    ['sku' => 'PROD-003', 'quantity' => 0],
+];
+
+$config = require 'config.php';
+$ebay = new Ebay($config);
+
+// Set tokens
+$ebay->setAccessToken($_SESSION['ebay_access_token'], $_SESSION['ebay_access_token_expires']);
+
+echo "Starting inventory sync...\n";
+
+foreach ($products as $product) {
+    try {
+        // Update eBay inventory via Commerce API
+        $result = $ebay->commerce()->createOrReplaceInventoryItem(
+            $product['sku'],
+            [
+                'availability' => [
+                    'shipToLocationAvailability' => [
+                        'quantity' => $product['quantity'],
+                    ],
+                ],
+            ]
+        );
+        
+        echo "✓ Updated {$product['sku']}: {$product['quantity']} units\n";
+        
+    } catch (\Exception $e) {
+        echo "✗ Failed {$product['sku']}: {$e->getMessage()}\n";
+    }
+    
+    // Rate limiting
+    usleep(200000); // 0.2 seconds delay
+}
+
+echo "Inventory sync completed!\n";
+```
+
+## Laravel Setup
 
 ### Installation
 
