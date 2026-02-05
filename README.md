@@ -29,7 +29,6 @@
 
 ### 📖 **Examples & Documentation**
 
-- [🎮 Real-World Success Stories](#-real-world-success-stories)
 - [🌟 Standalone PHP Examples](#-standalone-php-usage-without-laravel)
 - [🔧 Laravel Examples](#-laravel-using-the-facade)
 - [📚 Authentication Guide](#authentication)
@@ -330,30 +329,6 @@ EBAY_PRODUCTION_RUNAME=your-production-runame
 # 🌍 Default Marketplace
 EBAY_DEFAULT_SITE=US
 ```
-
----
-
-## 🎮 Real-World Success Stories
-
-### 📈 **Case Study: Multi-Channel E-commerce Platform**
-
-> *"We integrated eBay into our platform serving 10,000+ sellers. The package's performance and reliability exceeded our
-expectations. Our sellers can now manage eBay listings alongside Amazon and Shopify from one dashboard."*
-
-- **10,000+** active sellers
-- **50,000+** daily API calls
-- **99.9%** uptime
-- **2x** faster listing creation
-
-### 🤖 **Case Study: Dropshipping Automation**
-
-> *"Built a sophisticated dropshipping bot that automatically lists products from suppliers to eBay. The package's enum
-support and type safety made development incredibly smooth."*
-
-- **5,000+** automated listings
-- **24/7** price monitoring
-- **Automatic** inventory sync
-- **Zero** manual intervention
 
 ---
 
