@@ -1199,25 +1199,6 @@ Run specific test types:
 ./vendor/bin/phpunit tests/Feature
 ```
 
-## Package Comparison
-
-Why choose this eBay package over alternatives?
-
-| Feature             | This Package                  | Other Packages   |
-|---------------------|-------------------------------|------------------|
-| PHP Version         | 8.1+ (Modern)                 | 7.x (Legacy)     |
-| Type Safety         | ✅ Strict typing               | ❌ Minimal        |
-| Enums               | ✅ Native PHP 8.1              | ❌ Static classes |
-| OAuth 2.0           | ✅ Full support + auto-refresh | ⚠️ Basic         |
-| Laravel Integration | ✅ Service Provider + Facade   | ⚠️ Manual setup  |
-| Trading API         | ✅ Complete                    | ⚠️ Partial       |
-| Commerce API        | ✅ REST support                | ❌ Not included   |
-| Multi-Marketplace   | ✅ 15+ sites                   | ⚠️ Limited       |
-| Error Handling      | ✅ Custom exceptions           | ❌ Basic          |
-| Documentation       | ✅ Extensive + Examples        | ⚠️ Minimal       |
-| Testing             | ✅ PHPUnit suite               | ❌ None           |
-| Active Maintenance  | ✅ Yes                         | ❌ Abandoned      |
-
 ## Keywords & Tags
 
 **eBay API**, **Laravel eBay**, **PHP eBay SDK**, **eBay Trading API**, **eBay Commerce API**, **eBay OAuth**, **eBay
