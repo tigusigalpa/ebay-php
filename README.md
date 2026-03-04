@@ -10,6 +10,8 @@
 
 PHP SDK for eBay API. Supports Trading API (XML) and Commerce API (REST), OAuth 2.0 authentication, 20+ marketplaces. Works as standalone and with Laravel.
 
+> 📖 **[Full documentation available on Wiki](https://github.com/tigusigalpa/ebay-php/wiki)**
+
 ## Table of Contents
 
 - [Features](#features)
@@ -474,6 +476,7 @@ Enable logging in `config/ebay.php`:
 
 ## Support
 
+- **Wiki**: [Documentation & Guides](https://github.com/tigusigalpa/ebay-php/wiki)
 - **GitHub Issues**: [tigusigalpa/ebay-php/issues](https://github.com/tigusigalpa/ebay-php/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/tigusigalpa/ebay-php/discussions)
 - **Email**: sovletig@gmail.com
