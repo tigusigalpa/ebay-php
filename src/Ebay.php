@@ -8,6 +8,7 @@ use Tigusigalpa\Ebay\Enums\Site;
 use Tigusigalpa\Ebay\Exceptions\InvalidConfigurationException;
 use Tigusigalpa\Ebay\Http\Auth;
 use Tigusigalpa\Ebay\Http\Clients\CommerceClient;
+use Tigusigalpa\Ebay\Http\Clients\MessageClient;
 use Tigusigalpa\Ebay\Http\Clients\TradingClient;
 
 /**
@@ -24,6 +25,7 @@ class Ebay
     protected Auth $auth;
     protected TradingClient $trading;
     protected CommerceClient $commerce;
+    protected MessageClient $message;
     protected Site $site;
     protected string $environment;
 
@@ -77,6 +79,16 @@ class Ebay
             $this->site,
             $this->auth
         );
+
+        $this->message = new MessageClient(
+            $this->environment,
+            config("ebay.{$this->environment}.app_id"),
+            config("ebay.{$this->environment}.cert_id"),
+            config("ebay.{$this->environment}.dev_id"),
+            config("ebay.{$this->environment}.runame"),
+            $this->site,
+            $this->auth
+        );
     }
 
     protected function getDefaultSite(): Site
@@ -104,6 +116,11 @@ class Ebay
     public function commerce(): CommerceClient
     {
         return $this->commerce;
+    }
+
+    public function message(): MessageClient
+    {
+        return $this->message;
     }
 
     public function setSite(Site $site): self
@@ -141,6 +158,7 @@ class Ebay
     {
         $this->trading->setAccessToken($token, $expiresAt);
         $this->commerce->setAccessToken($token, $expiresAt);
+        $this->message->setAccessToken($token, $expiresAt);
         return $this;
     }
 
@@ -148,6 +166,7 @@ class Ebay
     {
         $this->trading->setRefreshToken($token, $expiresAt);
         $this->commerce->setRefreshToken($token, $expiresAt);
+        $this->message->setRefreshToken($token, $expiresAt);
         return $this;
     }
 

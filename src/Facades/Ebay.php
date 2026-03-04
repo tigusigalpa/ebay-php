@@ -14,6 +14,7 @@ use Tigusigalpa\Ebay\Http\Clients\TradingClient;
  * @method static Auth auth()
  * @method static TradingClient trading()
  * @method static CommerceClient commerce()
+ * @method static \Tigusigalpa\Ebay\Http\Clients\MessageClient message()
  * @method static \Tigusigalpa\Ebay\Ebay setSite(Site $site)
  * @method static Site getSite()
  * @method static \Tigusigalpa\Ebay\Ebay setEnvironment(string $environment)

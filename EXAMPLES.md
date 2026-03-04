@@ -11,6 +11,7 @@ applications.
 - [Authentication](#authentication)
 - [Trading API Examples](#trading-api-examples)
 - [Commerce API Examples](#commerce-api-examples)
+- [Message API Examples](#message-api-examples)
 - [Working with Enums](#working-with-enums)
 - [Error Handling](#error-handling)
 - [Advanced Usage](#advanced-usage)
@@ -802,6 +803,413 @@ if (isset($orders['orders'])) {
         echo "Total: {$order['pricingSummary']['total']['value']} {$order['pricingSummary']['total']['currency']}\n";
         echo "Status: {$order['orderFulfillmentStatus']}\n";
         echo "---\n";
+    }
+}
+```
+
+## Message API Examples
+
+### Get All Conversations
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+use Tigusigalpa\Ebay\Enums\ConversationType;
+use Tigusigalpa\Ebay\Enums\ConversationStatus;
+
+// Set user tokens first
+Ebay::setAccessToken($user->ebay_access_token, $user->ebay_access_token_expires_at);
+Ebay::setRefreshToken($user->ebay_refresh_token, $user->ebay_refresh_token_expires_at);
+
+// Get all active conversations from members
+$result = Ebay::message()->getConversations([
+    'conversation_type' => ConversationType::FROM_MEMBERS->value,
+    'conversation_status' => ConversationStatus::ACTIVE->value,
+    'limit' => 25,
+]);
+
+foreach ($result['conversations'] as $conversation) {
+    echo "Conversation ID: {$conversation->conversationId}\n";
+    echo "Title: {$conversation->conversationTitle}\n";
+    echo "Status: {$conversation->conversationStatus->title()}\n";
+    echo "Unread: {$conversation->unreadCount}\n";
+    
+    if ($conversation->latestMessage) {
+        echo "Latest: {$conversation->latestMessage->messageBody}\n";
+        echo "From: {$conversation->latestMessage->senderUsername}\n";
+    }
+    
+    echo "---\n";
+}
+
+// Pagination
+echo "Total conversations: {$result['total']}\n";
+echo "Showing: {$result['offset']} to " . ($result['offset'] + count($result['conversations'])) . "\n";
+
+if ($result['next']) {
+    echo "Next page available\n";
+}
+```
+
+### Get Conversations with Filters
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+use Tigusigalpa\Ebay\Enums\{ConversationType, ConversationStatus};
+
+// Get unread messages from a specific buyer about a specific listing
+$result = Ebay::message()->getConversations([
+    'conversation_type' => ConversationType::FROM_MEMBERS->value,
+    'conversation_status' => ConversationStatus::UNREAD->value,
+    'other_party_username' => 'buyer_username',
+    'reference_id' => '123456789',
+    'reference_type' => 'LISTING',
+    'start_time' => '2024-01-01T00:00:00.000Z',
+    'end_time' => '2024-01-31T23:59:59.999Z',
+    'limit' => 50,
+    'offset' => 0,
+]);
+
+foreach ($result['conversations'] as $conversation) {
+    echo "Item: {$conversation->referenceId}\n";
+    echo "Buyer: {$conversation->latestMessage->senderUsername}\n";
+    echo "Message: {$conversation->latestMessage->messageBody}\n";
+    echo "---\n";
+}
+```
+
+### Get Messages in a Conversation
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+use Tigusigalpa\Ebay\Enums\ConversationType;
+
+// Get all messages in a specific conversation
+$result = Ebay::message()->getConversation(
+    conversationId: 'c1234567890',
+    params: [
+        'conversation_type' => ConversationType::FROM_MEMBERS->value,
+        'limit' => 25,
+        'offset' => 0,
+    ]
+);
+
+foreach ($result['messages'] as $message) {
+    echo "{$message->senderUsername} ({$message->createdDate}):\n";
+    echo "{$message->messageBody}\n";
+    
+    // Check for attachments
+    if (!empty($message->messageMedia)) {
+        echo "Attachments:\n";
+        foreach ($message->messageMedia as $media) {
+            echo "  - {$media->mediaName} ({$media->mediaType->title()})\n";
+            echo "    URL: {$media->mediaUrl}\n";
+        }
+    }
+    
+    echo "Read: " . ($message->readStatus ? 'Yes' : 'No') . "\n";
+    echo "---\n";
+}
+
+echo "Total messages: {$result['total']}\n";
+```
+
+### Send a New Message to a Buyer
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+
+// Start a new conversation with a buyer about a listing
+$message = Ebay::message()->sendMessage([
+    'otherPartyUsername' => 'buyer_username',
+    'messageText' => 'Thank you for your question about this item. It is still available and in excellent condition.',
+    'reference' => [
+        'referenceId' => '123456789',
+        'referenceType' => 'LISTING',
+    ],
+    'emailCopyToSender' => false,
+]);
+
+echo "Message sent successfully!\n";
+echo "Message ID: {$message->messageId}\n";
+echo "Sent to: {$message->recipientUsername}\n";
+echo "Created: {$message->createdDate}\n";
+```
+
+### Reply to an Existing Conversation
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+
+// Reply in an existing conversation
+$message = Ebay::message()->sendMessage([
+    'conversationId' => 'c1234567890',
+    'messageText' => 'Here is the additional information you requested. The item will ship within 24 hours of payment.',
+]);
+
+echo "Reply sent!\n";
+echo "Message ID: {$message->messageId}\n";
+```
+
+### Send Message with Attachments
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+
+// Send a message with image attachments
+$message = Ebay::message()->sendMessage([
+    'conversationId' => 'c1234567890',
+    'messageText' => 'Here are additional photos of the item as requested.',
+    'messageMedia' => [
+        [
+            'mediaName' => 'detail_photo_1.jpg',
+            'mediaType' => 'IMAGE',
+            'mediaUrl' => 'https://example.com/photos/detail1.jpg',
+        ],
+        [
+            'mediaName' => 'detail_photo_2.jpg',
+            'mediaType' => 'IMAGE',
+            'mediaUrl' => 'https://example.com/photos/detail2.jpg',
+        ],
+    ],
+]);
+
+echo "Message with {$message->messageMedia} attachments sent!\n";
+```
+
+### Mark Conversation as Read
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+use Tigusigalpa\Ebay\Enums\ConversationType;
+
+// Mark a conversation as read
+Ebay::message()->updateConversation([
+    'conversationId' => 'c1234567890',
+    'conversationType' => ConversationType::FROM_MEMBERS->value,
+    'read' => true,
+]);
+
+echo "Conversation marked as read\n";
+```
+
+### Archive a Conversation
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+use Tigusigalpa\Ebay\Enums\ConversationType;
+
+// Archive a conversation
+Ebay::message()->updateConversation([
+    'conversationId' => 'c1234567890',
+    'conversationType' => ConversationType::FROM_MEMBERS->value,
+    'conversationStatus' => 'ARCHIVE',
+]);
+
+echo "Conversation archived\n";
+```
+
+### Bulk Archive Multiple Conversations
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+use Tigusigalpa\Ebay\Enums\ConversationType;
+
+// Archive multiple conversations at once (up to 10)
+$result = Ebay::message()->bulkUpdateConversation([
+    'conversations' => [
+        [
+            'conversationId' => 'c1111111111',
+            'conversationType' => ConversationType::FROM_MEMBERS->value,
+            'conversationStatus' => 'ARCHIVE',
+        ],
+        [
+            'conversationId' => 'c2222222222',
+            'conversationType' => ConversationType::FROM_MEMBERS->value,
+            'conversationStatus' => 'ARCHIVE',
+        ],
+        [
+            'conversationId' => 'c3333333333',
+            'conversationType' => ConversationType::FROM_MEMBERS->value,
+            'conversationStatus' => 'ARCHIVE',
+        ],
+    ],
+]);
+
+echo "Updated: {$result['conversationsMetadata']['successCount']} conversations\n";
+echo "Failed: {$result['conversationsMetadata']['failureCount']} conversations\n";
+```
+
+### Complete Message Management Example
+
+```php
+use Tigusigalpa\Ebay\Facades\Ebay;
+use Tigusigalpa\Ebay\Enums\{ConversationType, ConversationStatus};
+use Illuminate\Support\Facades\Log;
+
+class MessageManager
+{
+    public function processUnreadMessages()
+    {
+        // Get all unread conversations
+        $result = Ebay::message()->getConversations([
+            'conversation_type' => ConversationType::FROM_MEMBERS->value,
+            'conversation_status' => ConversationStatus::UNREAD->value,
+            'limit' => 50,
+        ]);
+        
+        foreach ($result['conversations'] as $conversation) {
+            try {
+                // Get full conversation history
+                $messages = Ebay::message()->getConversation(
+                    $conversation->conversationId,
+                    ['conversation_type' => ConversationType::FROM_MEMBERS->value]
+                );
+                
+                // Process the latest message
+                $latestMessage = $messages['messages'][0] ?? null;
+                
+                if ($latestMessage && !$latestMessage->readStatus) {
+                    // Auto-respond to common questions
+                    $response = $this->generateAutoResponse($latestMessage->messageBody);
+                    
+                    if ($response) {
+                        Ebay::message()->sendMessage([
+                            'conversationId' => $conversation->conversationId,
+                            'messageText' => $response,
+                        ]);
+                        
+                        Log::info("Auto-responded to conversation {$conversation->conversationId}");
+                    }
+                    
+                    // Mark as read
+                    Ebay::message()->updateConversation([
+                        'conversationId' => $conversation->conversationId,
+                        'conversationType' => ConversationType::FROM_MEMBERS->value,
+                        'read' => true,
+                    ]);
+                }
+                
+            } catch (\Exception $e) {
+                Log::error("Failed to process conversation {$conversation->conversationId}: {$e->getMessage()}");
+            }
+        }
+    }
+    
+    private function generateAutoResponse(string $messageBody): ?string
+    {
+        $messageBody = strtolower($messageBody);
+        
+        if (str_contains($messageBody, 'shipping')) {
+            return 'Thank you for your message. We ship within 24 hours of receiving payment via USPS Priority Mail.';
+        }
+        
+        if (str_contains($messageBody, 'available') || str_contains($messageBody, 'in stock')) {
+            return 'Yes, this item is currently available and ready to ship.';
+        }
+        
+        if (str_contains($messageBody, 'return')) {
+            return 'We accept returns within 30 days of delivery. Please see our return policy for full details.';
+        }
+        
+        // No auto-response for other messages
+        return null;
+    }
+    
+    public function archiveOldConversations()
+    {
+        // Get conversations older than 30 days
+        $endTime = now()->subDays(30)->toIso8601String();
+        
+        $result = Ebay::message()->getConversations([
+            'conversation_type' => ConversationType::FROM_MEMBERS->value,
+            'end_time' => $endTime,
+            'limit' => 10,
+        ]);
+        
+        if (empty($result['conversations'])) {
+            return;
+        }
+        
+        $conversationsToArchive = [];
+        foreach ($result['conversations'] as $conversation) {
+            $conversationsToArchive[] = [
+                'conversationId' => $conversation->conversationId,
+                'conversationType' => ConversationType::FROM_MEMBERS->value,
+                'conversationStatus' => 'ARCHIVE',
+            ];
+        }
+        
+        if (!empty($conversationsToArchive)) {
+            $result = Ebay::message()->bulkUpdateConversation([
+                'conversations' => $conversationsToArchive,
+            ]);
+            
+            Log::info("Archived {$result['conversationsMetadata']['successCount']} old conversations");
+        }
+    }
+}
+```
+
+### Laravel Job for Message Processing
+
+```php
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Tigusigalpa\Ebay\Facades\Ebay;
+use Tigusigalpa\Ebay\Enums\{ConversationType, ConversationStatus};
+
+class ProcessEbayMessages implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function __construct(
+        private int $userId
+    ) {}
+
+    public function handle(): void
+    {
+        $user = User::find($this->userId);
+        
+        if (!$user || !$user->ebay_access_token) {
+            return;
+        }
+        
+        // Set user tokens
+        Ebay::setAccessToken($user->ebay_access_token, $user->ebay_access_token_expires_at);
+        Ebay::setRefreshToken($user->ebay_refresh_token, $user->ebay_refresh_token_expires_at);
+        
+        // Get unread messages
+        $result = Ebay::message()->getConversations([
+            'conversation_type' => ConversationType::FROM_MEMBERS->value,
+            'conversation_status' => ConversationStatus::UNREAD->value,
+            'limit' => 25,
+        ]);
+        
+        foreach ($result['conversations'] as $conversation) {
+            // Store in database for notification
+            \App\Models\EbayMessage::updateOrCreate(
+                ['conversation_id' => $conversation->conversationId],
+                [
+                    'user_id' => $user->id,
+                    'title' => $conversation->conversationTitle,
+                    'latest_message' => $conversation->latestMessage?->messageBody,
+                    'sender_username' => $conversation->latestMessage?->senderUsername,
+                    'unread_count' => $conversation->unreadCount,
+                    'reference_id' => $conversation->referenceId,
+                    'created_at' => $conversation->createdDate,
+                ]
+            );
+        }
+        
+        // Send notification to user
+        if (count($result['conversations']) > 0) {
+            $user->notify(new \App\Notifications\NewEbayMessages(count($result['conversations'])));
+        }
     }
 }
 ```

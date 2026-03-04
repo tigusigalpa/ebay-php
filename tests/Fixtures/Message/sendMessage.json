@@ -1,0 +1,10 @@
+{
+  "messageId": "m1111222233",
+  "messageBody": "Thank you for your question about this item.",
+  "createdDate": "2024-01-15T14:30:00.000Z",
+  "readStatus": false,
+  "senderUserName": "seller456",
+  "recipientUserName": "buyer_username",
+  "subject": "Re: Item inquiry",
+  "messageMedia": []
+}

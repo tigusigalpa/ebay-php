@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2024-03-04
+
+### Added
+- **Message API (REST) client** with full support for eBay Commerce Message API v1.0
+  - `getConversations()` - Retrieve conversations with filtering and pagination
+  - `getConversation()` - Get all messages in a specific conversation
+  - `sendMessage()` - Send new messages or reply to existing conversations
+  - `updateConversation()` - Mark conversations as read, archive, or delete
+  - `bulkUpdateConversation()` - Update up to 10 conversations in a single request
+- **Three new Enums** for Message API:
+  - `ConversationStatus` (ACTIVE, ARCHIVED, DELETED, READ, UNREAD)
+  - `ConversationType` (FROM_EBAY, FROM_MEMBERS)
+  - `MessageMediaType` (IMAGE, PDF, DOC, TXT)
+- **Three new DTOs** for type-safe message handling:
+  - `MessageMedia` - Represents message attachments
+  - `Message` - Represents individual messages with sender, recipient, body, and media
+  - `Conversation` - Represents conversation threads with metadata
+- Added `commerce.message` OAuth scope to default configuration
+- Comprehensive test suite with fixtures for all Message API endpoints
+- Extensive documentation and usage examples in EXAMPLES.md
+- Laravel Job example for automated message processing
+
+### Changed
+- Updated `Ebay` main class to initialize and expose `MessageClient`
+- Updated Facade with `@method` annotation for IDE autocompletion
+- Enhanced token propagation to include MessageClient
+
 ## [1.0.0] - 2024-02-05
 
 ### Added

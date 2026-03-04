@@ -1,0 +1,44 @@
+{
+  "messages": [
+    {
+      "messageId": "m9876543210",
+      "messageBody": "Is this item still available?",
+      "createdDate": "2024-01-15T10:30:00.000Z",
+      "readStatus": true,
+      "senderUsername": "buyer123",
+      "recipientUsername": "seller456",
+      "subject": "Question about item #123456789",
+      "messageMedia": []
+    },
+    {
+      "messageId": "m9876543211",
+      "messageBody": "Yes, it is still available. Would you like to purchase it?",
+      "createdDate": "2024-01-15T11:45:00.000Z",
+      "readStatus": true,
+      "senderUsername": "seller456",
+      "recipientUsername": "buyer123",
+      "subject": "Re: Question about item #123456789",
+      "messageMedia": [
+        {
+          "mediaName": "product_detail.jpg",
+          "mediaType": "IMAGE",
+          "mediaUrl": "https://example.ebay.com/media/product_detail.jpg"
+        }
+      ]
+    },
+    {
+      "messageId": "m9876543212",
+      "messageBody": "Great! I'll buy it now.",
+      "createdDate": "2024-01-15T12:00:00.000Z",
+      "readStatus": true,
+      "senderUsername": "buyer123",
+      "recipientUsername": "seller456",
+      "subject": "Re: Question about item #123456789",
+      "messageMedia": []
+    }
+  ],
+  "href": "https://api.ebay.com/commerce/message/v1/conversation/c1234567890?conversation_type=FROM_MEMBERS&limit=25&offset=0",
+  "limit": 25,
+  "offset": 0,
+  "total": 3
+}

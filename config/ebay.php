@@ -86,6 +86,7 @@ return [
         'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
         'https://api.ebay.com/oauth/api_scope/commerce.notification.subscription',
         'https://api.ebay.com/oauth/api_scope/commerce.notification.subscription.readonly',
+        'https://api.ebay.com/oauth/api_scope/commerce.message',
     ],
 
     /*

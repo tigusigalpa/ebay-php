@@ -21,6 +21,7 @@ PHP SDK for eBay API. Supports Trading API (XML) and Commerce API (REST), OAuth 
 - [Authentication](#authentication)
 - [Trading API](#trading-api)
 - [Commerce API](#commerce-api)
+- [Message API](#message-api)
 - [Working with Marketplaces](#working-with-marketplaces)
 - [Enums and DTOs](#enums-and-dtos)
 - [Error Handling](#error-handling)
@@ -35,6 +36,7 @@ PHP SDK for eBay API. Supports Trading API (XML) and Commerce API (REST), OAuth 
 **API:**
 - Trading API (XML) — orders, listings, categories, GetMyEbaySelling, etc.
 - Commerce API (REST) — inventory, fulfillment, taxonomy, translation
+- Message API (REST) — buyer-seller messaging, conversations, notifications
 - OAuth 2.0 with automatic token refresh
 - 20+ marketplaces (US, UK, DE, FR, AU, etc.)
 
@@ -283,6 +285,67 @@ $aspects = Ebay::commerce()->getItemAspectsForCategory('0', '12345');
 foreach ($aspects['aspects'] as $aspect) {
     echo $aspect['localizedAspectName'];
 }
+```
+
+## Message API
+
+### Get Conversations
+
+```php
+use Tigusigalpa\Ebay\Enums\{ConversationType, ConversationStatus};
+
+$result = Ebay::message()->getConversations([
+    'conversation_type' => ConversationType::FROM_MEMBERS->value,
+    'conversation_status' => ConversationStatus::UNREAD->value,
+    'limit' => 25,
+]);
+
+foreach ($result['conversations'] as $conversation) {
+    echo $conversation->conversationTitle;
+    echo $conversation->latestMessage?->messageBody;
+}
+```
+
+### Send Message
+
+```php
+// Start new conversation
+$message = Ebay::message()->sendMessage([
+    'otherPartyUsername' => 'buyer_username',
+    'messageText' => 'Thank you for your question.',
+    'reference' => [
+        'referenceId' => '123456789',
+        'referenceType' => 'LISTING',
+    ],
+]);
+
+// Reply to conversation
+$message = Ebay::message()->sendMessage([
+    'conversationId' => 'c1234567890',
+    'messageText' => 'Here is the information you requested.',
+]);
+```
+
+### Manage Conversations
+
+```php
+// Mark as read
+Ebay::message()->updateConversation([
+    'conversationId' => 'c1234567890',
+    'conversationType' => ConversationType::FROM_MEMBERS->value,
+    'read' => true,
+]);
+
+// Archive multiple conversations
+$result = Ebay::message()->bulkUpdateConversation([
+    'conversations' => [
+        [
+            'conversationId' => 'c1111111111',
+            'conversationType' => ConversationType::FROM_MEMBERS->value,
+            'conversationStatus' => 'ARCHIVE',
+        ],
+    ],
+]);
 ```
 
 ## Working with Marketplaces

@@ -1,0 +1,48 @@
+{
+  "conversations": [
+    {
+      "conversationId": "c1234567890",
+      "conversationStatus": "ACTIVE",
+      "conversationTitle": "Question about item #123456789",
+      "conversationType": "FROM_MEMBERS",
+      "createdDate": "2024-01-15T10:30:00.000Z",
+      "latestMessage": {
+        "messageId": "m9876543210",
+        "messageBody": "Is this item still available?",
+        "createdDate": "2024-01-15T10:30:00.000Z",
+        "readStatus": false,
+        "senderUsername": "buyer123",
+        "recipientUsername": "seller456",
+        "subject": "Question about item #123456789",
+        "messageMedia": []
+      },
+      "referenceId": "123456789",
+      "referenceType": "LISTING",
+      "unreadCount": 1
+    },
+    {
+      "conversationId": "c0987654321",
+      "conversationStatus": "READ",
+      "conversationTitle": "Shipping inquiry",
+      "conversationType": "FROM_MEMBERS",
+      "createdDate": "2024-01-14T15:20:00.000Z",
+      "latestMessage": {
+        "messageId": "m1234567890",
+        "messageBody": "When will this ship?",
+        "createdDate": "2024-01-14T15:20:00.000Z",
+        "readStatus": true,
+        "senderUsername": "buyer789",
+        "recipientUsername": "seller456",
+        "subject": "Shipping inquiry",
+        "messageMedia": []
+      },
+      "referenceId": "987654321",
+      "referenceType": "LISTING",
+      "unreadCount": 0
+    }
+  ],
+  "href": "https://api.ebay.com/commerce/message/v1/conversation?conversation_type=FROM_MEMBERS&limit=25&offset=0",
+  "limit": 25,
+  "offset": 0,
+  "total": 2
+}

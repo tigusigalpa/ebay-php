@@ -1,0 +1,11 @@
+{
+  "errors": [
+    {
+      "errorId": 1001,
+      "domain": "API_MESSAGE",
+      "category": "REQUEST",
+      "message": "Invalid conversation_type parameter. Must be FROM_EBAY or FROM_MEMBERS.",
+      "longMessage": "The conversation_type query parameter is required and must be either FROM_EBAY or FROM_MEMBERS."
+    }
+  ]
+}
