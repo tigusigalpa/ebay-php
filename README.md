@@ -21,6 +21,7 @@ PHP SDK for eBay API. Supports Trading API (XML) and Commerce API (REST), OAuth 
 - [Authentication](#authentication)
 - [Trading API](#trading-api)
 - [Commerce API](#commerce-api)
+- [Fulfillment API](#fulfillment-api)
 - [Message API](#message-api)
 - [Working with Marketplaces](#working-with-marketplaces)
 - [Enums and DTOs](#enums-and-dtos)
@@ -35,7 +36,8 @@ PHP SDK for eBay API. Supports Trading API (XML) and Commerce API (REST), OAuth 
 
 **API:**
 - Trading API (XML) — orders, listings, categories, GetMyEbaySelling, etc.
-- Commerce API (REST) — inventory, fulfillment, taxonomy, translation
+- Commerce API (REST) — inventory, taxonomy, translation
+- Fulfillment API (REST) — orders, shipping fulfillments, refunds, payment disputes
 - Message API (REST) — buyer-seller messaging, conversations, notifications
 - OAuth 2.0 with automatic token refresh
 - 20+ marketplaces (US, UK, DE, FR, AU, etc.)
@@ -287,6 +289,256 @@ foreach ($aspects['aspects'] as $aspect) {
 }
 ```
 
+## Fulfillment API
+
+The Fulfillment API v1 provides comprehensive order management, shipping fulfillment, refunds, and payment dispute handling.
+
+### Get Orders
+
+```php
+use Tigusigalpa\Ebay\Http\Resources\Fulfillment\{Order, OrderSearchPagedCollection};
+
+// Get single order
+$order = Ebay::fulfillment()->getOrder('12-34567-89012');
+echo $order->orderId;
+echo $order->orderFulfillmentStatus;
+echo $order->pricingSummary?->total?->value;
+
+// Get multiple orders with filters
+$orders = Ebay::fulfillment()->getOrders([
+    'filter' => 'creationdate:[2024-01-01T00:00:00.000Z..]',
+    'limit' => 50,
+    'offset' => 0,
+]);
+
+foreach ($orders->orders as $order) {
+    echo $order->orderId;
+    echo $order->buyer?->username;
+}
+
+// Filter by order status
+$orders = Ebay::fulfillment()->getOrders([
+    'filter' => 'orderfulfillmentstatus:{NOT_STARTED|IN_PROGRESS}',
+]);
+
+// Get specific orders by IDs
+$orders = Ebay::fulfillment()->getOrders([
+    'orderIds' => '12-34567-89012,12-34567-89013',
+]);
+
+// Include tax breakdown
+$order = Ebay::fulfillment()->getOrder('12-34567-89012', [
+    'fieldGroups' => 'TAX_BREAKDOWN',
+]);
+```
+
+### Issue Refunds
+
+```php
+use Tigusigalpa\Ebay\Enums\ReasonForRefundEnum;
+
+// Full refund
+$refund = Ebay::fulfillment()->issueRefund('12-34567-89012', [
+    'reasonForRefund' => ReasonForRefundEnum::BUYER_CANCEL->value,
+    'comment' => 'Customer requested cancellation',
+    'orderLevelRefundAmount' => [
+        'value' => '99.99',
+        'currency' => 'USD',
+    ],
+]);
+
+// Partial refund for specific line items
+$refund = Ebay::fulfillment()->issueRefund('12-34567-89012', [
+    'reasonForRefund' => ReasonForRefundEnum::DEFECTIVE_ITEM->value,
+    'refundItems' => [
+        [
+            'lineItemId' => '123456789',
+            'refundAmount' => [
+                'value' => '25.00',
+                'currency' => 'USD',
+            ],
+        ],
+    ],
+]);
+
+echo $refund->refundId;
+echo $refund->refundStatus;
+```
+
+### Shipping Fulfillments
+
+```php
+// Create shipping fulfillment
+$fulfillmentId = Ebay::fulfillment()->createShippingFulfillment('12-34567-89012', [
+    'lineItems' => [
+        [
+            'lineItemId' => '123456789',
+            'quantity' => 1,
+        ],
+    ],
+    'shippedDate' => now()->toIso8601String(),
+    'shippingCarrierCode' => 'USPS',
+    'trackingNumber' => '1234567890123456',
+]);
+
+// Get single fulfillment
+$fulfillment = Ebay::fulfillment()->getShippingFulfillment(
+    '12-34567-89012',
+    $fulfillmentId
+);
+
+echo $fulfillment->shipmentTrackingNumber;
+echo $fulfillment->shippingCarrierCode;
+
+// Get all fulfillments for order
+$fulfillments = Ebay::fulfillment()->getShippingFulfillments('12-34567-89012');
+
+foreach ($fulfillments->fulfillments as $fulfillment) {
+    echo $fulfillment->trackingNumber;
+}
+```
+
+### Payment Disputes
+
+```php
+use Tigusigalpa\Ebay\Enums\{DisputeStatusEnum, EvidenceTypeEnum};
+
+// Get dispute summaries
+$disputes = Ebay::fulfillment()->getPaymentDisputeSummaries([
+    'payment_dispute_status' => DisputeStatusEnum::OPEN->value,
+    'limit' => 50,
+]);
+
+foreach ($disputes->paymentDisputeSummaries as $summary) {
+    echo $summary->paymentDisputeId;
+    echo $summary->reason;
+    echo $summary->amount?->value;
+}
+
+// Get full dispute details
+$dispute = Ebay::fulfillment()->getPaymentDispute('5001234567890');
+
+echo $dispute->paymentDisputeStatus?->value;
+echo $dispute->respondByDate;
+echo $dispute->revision; // Required for contesting
+
+// Get dispute activity history
+$history = Ebay::fulfillment()->getActivities('5001234567890');
+
+foreach ($history->activities as $activity) {
+    echo $activity->activityType;
+    echo $activity->activityDate;
+}
+
+// Upload evidence file
+$uploadResponse = Ebay::fulfillment()->uploadEvidenceFile(
+    '5001234567890',
+    file_get_contents('/path/to/tracking-proof.pdf')
+);
+
+$fileId = $uploadResponse->fileId;
+
+// Add evidence
+$evidenceResponse = Ebay::fulfillment()->addEvidence('5001234567890', [
+    'evidenceType' => EvidenceTypeEnum::PROOF_OF_DELIVERY->value,
+    'files' => [
+        ['fileId' => $fileId],
+    ],
+    'lineItems' => [
+        [
+            'itemId' => '123456789',
+            'lineItemId' => '987654321',
+        ],
+    ],
+]);
+
+$evidenceId = $evidenceResponse->evidenceId;
+
+// Update evidence
+Ebay::fulfillment()->updateEvidence('5001234567890', [
+    'evidenceId' => $evidenceId,
+    'evidenceType' => EvidenceTypeEnum::PROOF_OF_DELIVERY->value,
+    'files' => [
+        ['fileId' => $fileId],
+    ],
+]);
+
+// Contest dispute
+Ebay::fulfillment()->contestPaymentDispute('5001234567890', [
+    'revision' => $dispute->revision,
+    'returnAddress' => [
+        'addressLine1' => '123 Main St',
+        'city' => 'New York',
+        'stateOrProvince' => 'NY',
+        'postalCode' => '10001',
+        'countryCode' => 'US',
+        'fullName' => 'Your Company',
+    ],
+]);
+
+// Accept dispute
+Ebay::fulfillment()->acceptPaymentDispute('5001234567890');
+
+// Download evidence file
+$fileContent = Ebay::fulfillment()->fetchEvidenceContent(
+    '5001234567890',
+    $evidenceId,
+    $fileId
+);
+
+file_put_contents('evidence.pdf', $fileContent);
+```
+
+### Filter Examples
+
+```php
+// Orders created in date range
+$orders = Ebay::fulfillment()->getOrders([
+    'filter' => 'creationdate:[2024-01-01T00:00:00.000Z..2024-12-31T23:59:59.999Z]',
+]);
+
+// Orders by fulfillment status
+$orders = Ebay::fulfillment()->getOrders([
+    'filter' => 'orderfulfillmentstatus:{NOT_STARTED}',
+]);
+
+// Disputes by buyer
+$disputes = Ebay::fulfillment()->getPaymentDisputeSummaries([
+    'buyer_username' => 'buyer123',
+]);
+
+// Disputes by order ID
+$disputes = Ebay::fulfillment()->getPaymentDisputeSummaries([
+    'order_id' => '12-34567-89012',
+]);
+
+// Disputes opened in date range
+$disputes = Ebay::fulfillment()->getPaymentDisputeSummaries([
+    'open_date_from' => '2024-01-01T00:00:00.000Z',
+    'open_date_to' => '2024-12-31T23:59:59.999Z',
+]);
+```
+
+### OAuth Scopes
+
+Fulfillment API requires specific OAuth scopes:
+
+- **Read operations**: `https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly`
+- **Write operations**: `https://api.ebay.com/oauth/api_scope/sell.fulfillment`
+- **Refunds**: `https://api.ebay.com/oauth/api_scope/sell.finances`
+- **Payment disputes**: `https://api.ebay.com/oauth/api_scope/sell.payment.dispute`
+
+Add to `config/ebay.php`:
+
+```php
+'scopes' => [
+    'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
+    'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
+    'https://api.ebay.com/oauth/api_scope/sell.finances',
+    'https://api.ebay.com/oauth/api_scope/sell.payment.dispute',
+],
+```
+
 ## Message API
 
 ### Get Conversations
@@ -382,7 +634,18 @@ foreach ([Site::UK, Site::GERMANY, Site::FRANCE] as $site) {
 Package uses PHP 8.1 Enums for type safety:
 
 ```php
-use Tigusigalpa\Ebay\Enums\{Site, Currency, ListingStatus, OrderStatus, PaymentStatus, ListingType};
+use Tigusigalpa\Ebay\Enums\{
+    Site, 
+    Currency, 
+    ListingStatus, 
+    OrderStatus, 
+    PaymentStatus, 
+    ListingType,
+    ReasonForRefundEnum,
+    DisputeStatusEnum,
+    EvidenceTypeEnum,
+    SellerDecisionEnum
+};
 
 // Currency
 $currency = Currency::USD;
@@ -398,13 +661,29 @@ $status->description();
 // Listing Type
 $listingType = ListingType::FIXED_PRICE;
 $listingType->description(); // "Buy It Now format with a fixed price"
+
+// Fulfillment API Enums
+$reason = ReasonForRefundEnum::BUYER_CANCEL;
+$reason->title();         // "Buyer Cancel"
+
+$disputeStatus = DisputeStatusEnum::OPEN;
+$disputeStatus->title();  // "Open"
+
+$evidenceType = EvidenceTypeEnum::PROOF_OF_DELIVERY;
+$evidenceType->title();   // "Proof of Delivery"
 ```
 
 ### DTOs
 
 ```php
 use Tigusigalpa\Ebay\Http\Resources\{Order, Item};
+use Tigusigalpa\Ebay\Http\Resources\Fulfillment\{
+    Order as FulfillmentOrder,
+    ShippingFulfillment,
+    PaymentDispute
+};
 
+// Trading API DTOs
 $xml = Ebay::trading()->getOrders();
 foreach ($xml->OrderArray->Order as $orderXml) {
     $order = Order::fromXml($orderXml);
@@ -414,8 +693,29 @@ foreach ($xml->OrderArray->Order as $orderXml) {
     echo $order->orderStatus->title();
 }
 
-// Convert to array
-$array = $order->toArray();
+// Fulfillment API DTOs (immutable with readonly properties)
+$order = Ebay::fulfillment()->getOrder('12-34567-89012');
+
+// Access nested DTOs
+echo $order->buyer?->username;
+echo $order->pricingSummary?->total?->value;
+echo $order->pricingSummary?->total?->currency;
+
+// Line items
+foreach ($order->lineItems ?? [] as $lineItem) {
+    echo $lineItem->title;
+    echo $lineItem->lineItemCost?->value;
+    echo $lineItem->quantity;
+}
+
+// Payment disputes
+$dispute = Ebay::fulfillment()->getPaymentDispute('5001234567890');
+echo $dispute->paymentDisputeStatus?->title();
+echo $dispute->amount?->value;
+
+// All DTOs use static fromArray() factory method
+$orderData = ['orderId' => '12-34567-89012', /* ... */];
+$order = FulfillmentOrder::fromArray($orderData);
 ```
 
 ## Error Handling
@@ -548,6 +848,7 @@ Enable logging in `config/ebay.php`:
 
 - [Trading API Reference](https://developer.ebay.com/devzone/xml/docs/Reference/ebay/index.html)
 - [Commerce API Reference](https://developer.ebay.com/api-docs/commerce/static/overview.html)
+- [Fulfillment API Reference](https://developer.ebay.com/api-docs/sell/fulfillment/resources/methods)
 - [OAuth 2.0 Guide](https://developer.ebay.com/api-docs/static/oauth-tokens.html)
 - [Error Messages](https://developer.ebay.com/devzone/xml/docs/Reference/ebay/Errors/errormessages.htm)
 - [API Rate Limits](https://developer.ebay.com/support/app-check)
