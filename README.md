@@ -8,7 +8,7 @@
 [![Laravel](https://img.shields.io/badge/Laravel-9%2B-FF2D20.svg?style=flat-square&logo=Laravel)](https://laravel.com)
 [![eBay](https://img.shields.io/badge/eBay-API-0064D2.svg?style=flat-square&logo=eBay)](https://developer.ebay.com)
 
-PHP SDK for eBay API. Supports Trading API (XML) and Commerce API (REST), OAuth 2.0 authentication, 20+ marketplaces. Works as standalone and with Laravel.
+PHP SDK for eBay API. Supports Trading API (XML), Commerce API (REST), Fulfillment API, Logistics API, OAuth 2.0 authentication, 20+ marketplaces. Works as standalone and with Laravel.
 
 > 📖 **[Full documentation available on Wiki](https://github.com/tigusigalpa/ebay-php/wiki)**
 
@@ -22,6 +22,7 @@ PHP SDK for eBay API. Supports Trading API (XML) and Commerce API (REST), OAuth 
 - [Trading API](#trading-api)
 - [Commerce API](#commerce-api)
 - [Fulfillment API](#fulfillment-api)
+- [Logistics API](#logistics-api)
 - [Message API](#message-api)
 - [Working with Marketplaces](#working-with-marketplaces)
 - [Enums and DTOs](#enums-and-dtos)
@@ -38,6 +39,7 @@ PHP SDK for eBay API. Supports Trading API (XML) and Commerce API (REST), OAuth 
 - Trading API (XML) — orders, listings, categories, GetMyEbaySelling, etc.
 - Commerce API (REST) — inventory, taxonomy, translation
 - Fulfillment API (REST) — orders, shipping fulfillments, refunds, payment disputes
+- Logistics API (REST) — shipping quotes, label generation, shipment tracking
 - Message API (REST) — buyer-seller messaging, conversations, notifications
 - OAuth 2.0 with automatic token refresh
 - 20+ marketplaces (US, UK, DE, FR, AU, etc.)
@@ -539,6 +541,245 @@ Add to `config/ebay.php`:
 ],
 ```
 
+## Logistics API
+
+The Logistics API v1_beta provides shipping quote generation, label creation, and shipment management through eBay's integrated shipping carriers.
+
+### Create Shipping Quote
+
+```php
+use Tigusigalpa\Ebay\Http\Resources\Logistics\{ShippingQuote, Shipment};
+
+// Create a shipping quote to get available rates
+$quote = Ebay::logistics()->createShippingQuote([
+    'orderId' => '12-12345-12345',
+    'packageSpecification' => [
+        'dimensions' => [
+            'length' => '10',
+            'width' => '10',
+            'height' => '5',
+            'unit' => 'INCH',
+        ],
+        'weight' => [
+            'value' => '2',
+            'unit' => 'POUND',
+        ],
+    ],
+    'shipFrom' => [
+        'fullName' => 'John Seller',
+        'contactAddress' => [
+            'addressLine1' => '123 Main St',
+            'city' => 'San Jose',
+            'stateOrProvince' => 'CA',
+            'postalCode' => '95131',
+            'countryCode' => 'US',
+        ],
+        'primaryPhone' => [
+            'phoneNumber' => '555-1234',
+        ],
+        'email' => 'seller@example.com',
+    ],
+    'shipTo' => [
+        'fullName' => 'Jane Buyer',
+        'contactAddress' => [
+            'addressLine1' => '456 Oak Ave',
+            'city' => 'Austin',
+            'stateOrProvince' => 'TX',
+            'postalCode' => '78701',
+            'countryCode' => 'US',
+        ],
+    ],
+]);
+
+echo $quote->shippingQuoteId;
+echo $quote->expirationDate;
+
+// Review available rates
+foreach ($quote->rates ?? [] as $rate) {
+    echo $rate->shippingServiceName;
+    echo $rate->shippingCost?->value;
+    echo $rate->shippingCost?->currency;
+    echo $rate->minEstimatedDeliveryDate;
+    echo $rate->maxEstimatedDeliveryDate;
+    
+    // Check rate recommendations
+    if (in_array('CHEAPEST_RATE', $rate->rateRecommendation ?? [])) {
+        echo "This is the cheapest option!";
+    }
+}
+```
+
+### Get Shipping Quote
+
+```php
+// Retrieve an existing shipping quote
+$quote = Ebay::logistics()->getShippingQuote($shippingQuoteId);
+
+echo $quote->shippingQuoteId;
+echo $quote->orderId;
+
+foreach ($quote->rates ?? [] as $rate) {
+    echo $rate->rateId;
+    echo $rate->carrierId;
+    echo $rate->shippingCarrierCode;
+}
+```
+
+### Create Shipment from Quote
+
+```php
+// Select a rate and create the shipment
+$rateId = $quote->rates[0]->rateId; // Pick the first rate
+
+$shipment = Ebay::logistics()->createFromShippingQuote([
+    'shippingQuoteId' => $quote->shippingQuoteId,
+    'rateId' => $rateId,
+    'labelSize' => '4"x6"',
+    'labelCustomMessage' => 'Thank you for your purchase!',
+]);
+
+echo $shipment->shipmentId;
+echo $shipment->shipmentTrackingNumber;
+echo $shipment->labelStatus; // OPEN, PURCHASED, EXPIRED, CANCELLED
+echo $shipment->creationDate;
+echo $shipment->labelExpirationDate;
+```
+
+### Download Shipping Label
+
+```php
+// Download label as PDF (default)
+$labelPdf = Ebay::logistics()->downloadLabelFile($shipment->shipmentId);
+file_put_contents('shipping-label.pdf', $labelPdf);
+
+// Download label as ZPL (for thermal printers)
+$labelZpl = Ebay::logistics()->downloadLabelFile(
+    $shipment->shipmentId,
+    'application/zpl'
+);
+file_put_contents('shipping-label.zpl', $labelZpl);
+```
+
+### Get Shipment Details
+
+```php
+// Retrieve shipment information
+$shipment = Ebay::logistics()->getShipment($shipmentId);
+
+echo $shipment->shipmentId;
+echo $shipment->shipmentTrackingNumber;
+echo $shipment->labelStatus;
+echo $shipment->labelCustomMessage;
+
+// Access rate details
+echo $shipment->rate?->shippingServiceCode;
+echo $shipment->rate?->shippingCost?->value;
+echo $shipment->rate?->carrierId;
+
+// Access addresses
+echo $shipment->shipFrom?->fullName;
+echo $shipment->shipFrom?->contactAddress?->city;
+echo $shipment->shipTo?->fullName;
+echo $shipment->returnTo?->contactAddress?->addressLine1;
+```
+
+### Cancel Shipment
+
+```php
+// Cancel a shipment before label expiration
+Ebay::logistics()->cancelShipment($shipmentId);
+
+// After cancellation, labelStatus changes to CANCELLED
+$shipment = Ebay::logistics()->getShipment($shipmentId);
+echo $shipment->labelStatus; // CANCELLED
+```
+
+### Complete Workflow Example
+
+```php
+// Step 1: Create shipping quote
+$quote = Ebay::logistics()->createShippingQuote([
+    'orderId' => '12-12345-12345',
+    'packageSpecification' => [
+        'dimensions' => ['length' => '10', 'width' => '10', 'height' => '5', 'unit' => 'INCH'],
+        'weight' => ['value' => '2', 'unit' => 'POUND'],
+    ],
+    'shipFrom' => [
+        'fullName' => 'Your Store',
+        'contactAddress' => [
+            'addressLine1' => '123 Warehouse Rd',
+            'city' => 'Los Angeles',
+            'stateOrProvince' => 'CA',
+            'postalCode' => '90001',
+            'countryCode' => 'US',
+        ],
+    ],
+    'shipTo' => [
+        'fullName' => 'Customer Name',
+        'contactAddress' => [
+            'addressLine1' => '789 Customer St',
+            'city' => 'New York',
+            'stateOrProvince' => 'NY',
+            'postalCode' => '10001',
+            'countryCode' => 'US',
+        ],
+    ],
+]);
+
+// Step 2: Find the cheapest rate
+$cheapestRate = null;
+$lowestCost = PHP_FLOAT_MAX;
+
+foreach ($quote->rates ?? [] as $rate) {
+    $cost = (float) ($rate->shippingCost?->value ?? 0);
+    if ($cost < $lowestCost) {
+        $lowestCost = $cost;
+        $cheapestRate = $rate;
+    }
+}
+
+// Step 3: Create shipment with selected rate
+$shipment = Ebay::logistics()->createFromShippingQuote([
+    'shippingQuoteId' => $quote->shippingQuoteId,
+    'rateId' => $cheapestRate->rateId,
+    'labelSize' => '4"x6"',
+]);
+
+// Step 4: Download and save label
+$labelPdf = Ebay::logistics()->downloadLabelFile($shipment->shipmentId);
+$filename = "label-{$shipment->shipmentId}.pdf";
+Storage::put("shipping-labels/{$filename}", $labelPdf);
+
+// Step 5: Update order with tracking number
+Ebay::fulfillment()->createShippingFulfillment($quote->orderId, [
+    'lineItems' => [/* ... */],
+    'shippedDate' => now()->toIso8601String(),
+    'shippingCarrierCode' => $shipment->rate?->shippingCarrierCode,
+    'trackingNumber' => $shipment->shipmentTrackingNumber,
+]);
+
+Log::info('Shipping label created', [
+    'shipment_id' => $shipment->shipmentId,
+    'tracking_number' => $shipment->shipmentTrackingNumber,
+    'cost' => $shipment->rate?->shippingCost?->value,
+]);
+```
+
+### OAuth Scope
+
+Logistics API requires the following OAuth scope:
+
+- **All operations**: `https://api.ebay.com/oauth/api_scope/sell.logistics`
+
+Add to `config/ebay.php`:
+
+```php
+'scopes' => [
+    'https://api.ebay.com/oauth/api_scope/sell.logistics',
+    // ... other scopes
+],
+```
+
 ## Message API
 
 ### Get Conversations
@@ -849,6 +1090,7 @@ Enable logging in `config/ebay.php`:
 - [Trading API Reference](https://developer.ebay.com/devzone/xml/docs/Reference/ebay/index.html)
 - [Commerce API Reference](https://developer.ebay.com/api-docs/commerce/static/overview.html)
 - [Fulfillment API Reference](https://developer.ebay.com/api-docs/sell/fulfillment/resources/methods)
+- [Logistics API Reference](https://developer.ebay.com/api-docs/sell/logistics/resources/methods)
 - [OAuth 2.0 Guide](https://developer.ebay.com/api-docs/static/oauth-tokens.html)
 - [Error Messages](https://developer.ebay.com/devzone/xml/docs/Reference/ebay/Errors/errormessages.htm)
 - [API Rate Limits](https://developer.ebay.com/support/app-check)
